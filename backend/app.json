@@ -1,0 +1,55 @@
+{
+  "name": "livestream-platform",
+  "description": "Creator-focused live-streaming platform",
+  "repository": "https://github.com/your-username/livestream-platform",
+  "keywords": ["node", "nestjs", "typescript", "livestream"],
+  "stack": "heroku-22",
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0"
+    },
+    {
+      "plan": "heroku-redis:mini"
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "value": "production"
+    },
+    "JWT_SECRET": {
+      "generator": "secret"
+    },
+    "JWT_REFRESH_SECRET": {
+      "generator": "secret"
+    },
+    "AGORA_APP_ID": {
+      "description": "Agora App ID for live streaming"
+    },
+    "AGORA_APP_CERTIFICATE": {
+      "description": "Agora App Certificate"
+    },
+    "STRIPE_SECRET_KEY": {
+      "description": "Stripe secret key for payments"
+    },
+    "STRIPE_WEBHOOK_SECRET": {
+      "description": "Stripe webhook secret"
+    },
+    "CORS_ORIGIN": {
+      "description": "Allowed CORS origins"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "scripts": {
+    "postdeploy": "npm run migration:run"
+  }
+}
