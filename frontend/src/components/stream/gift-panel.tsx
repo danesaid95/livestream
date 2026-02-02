@@ -12,12 +12,13 @@ interface Gift {
   id: string;
   name: string;
   iconUrl: string | null;
-  pointsCost: number;
-  animationType: string;
+  pointCost: number;
+  tier: string;
 }
 
 interface GiftPanelProps {
   streamId: string;
+  receiverId: string;
   isOpen: boolean;
   onClose: () => void;
   onGiftSent?: (gift: Gift, amount: number) => void;
@@ -34,16 +35,21 @@ const giftIcons: Record<string, React.ReactNode> = {
 };
 
 const giftColors: Record<string, string> = {
-  heart: "from-pink-500 to-red-500",
-  star: "from-yellow-400 to-orange-500",
-  sparkles: "from-violet-500 to-purple-600",
-  crown: "from-yellow-500 to-amber-600",
-  gem: "from-cyan-400 to-blue-500",
-  rocket: "from-red-500 to-orange-500",
+  basic: "from-gray-500 to-gray-600",
+  standard: "from-violet-500 to-purple-600",
+  premium: "from-cyan-400 to-blue-500",
+  legendary: "from-yellow-500 to-orange-500",
   default: "from-gray-500 to-gray-600",
 };
 
-export function GiftPanel({ streamId, isOpen, onClose, onGiftSent }: GiftPanelProps) {
+const tierColors: Record<string, string> = {
+  basic: "text-gray-400",
+  standard: "text-violet-400",
+  premium: "text-cyan-400",
+  legendary: "text-yellow-400",
+};
+
+export function GiftPanel({ streamId, receiverId, isOpen, onClose, onGiftSent }: GiftPanelProps) {
   const { user, isAuthenticated } = useAuthStore();
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [selectedGift, setSelectedGift] = useState<Gift | null>(null);
@@ -60,12 +66,12 @@ export function GiftPanel({ streamId, isOpen, onClose, onGiftSent }: GiftPanelPr
         console.error("Failed to fetch gifts:", error);
         // Use mock gifts for demo
         setGifts([
-          { id: "1", name: "Heart", iconUrl: null, pointsCost: 10, animationType: "heart" },
-          { id: "2", name: "Star", iconUrl: null, pointsCost: 50, animationType: "star" },
-          { id: "3", name: "Sparkles", iconUrl: null, pointsCost: 100, animationType: "sparkles" },
-          { id: "4", name: "Crown", iconUrl: null, pointsCost: 500, animationType: "crown" },
-          { id: "5", name: "Gem", iconUrl: null, pointsCost: 1000, animationType: "gem" },
-          { id: "6", name: "Rocket", iconUrl: null, pointsCost: 5000, animationType: "rocket" },
+          { id: "1", name: "Heart", iconUrl: null, pointCost: 10, tier: "basic" },
+          { id: "2", name: "Star", iconUrl: null, pointCost: 50, tier: "basic" },
+          { id: "3", name: "Sparkles", iconUrl: null, pointCost: 100, tier: "standard" },
+          { id: "4", name: "Crown", iconUrl: null, pointCost: 500, tier: "standard" },
+          { id: "5", name: "Gem", iconUrl: null, pointCost: 1000, tier: "premium" },
+          { id: "6", name: "Rocket", iconUrl: null, pointCost: 5000, tier: "legendary" },
         ]);
       } finally {
         setIsLoading(false);
@@ -78,9 +84,9 @@ export function GiftPanel({ streamId, isOpen, onClose, onGiftSent }: GiftPanelPr
   }, [isOpen]);
 
   const handleSendGift = async () => {
-    if (!selectedGift || !isAuthenticated || isSending) return;
+    if (!selectedGift || !isAuthenticated || isSending || !receiverId) return;
 
-    const totalCost = selectedGift.pointsCost * amount;
+    const totalCost = selectedGift.pointCost * amount;
     if ((user?.pointBalance || 0) < totalCost) {
       alert("Not enough points! Purchase more points to send this gift.");
       return;
@@ -88,7 +94,12 @@ export function GiftPanel({ streamId, isOpen, onClose, onGiftSent }: GiftPanelPr
 
     setIsSending(true);
     try {
-      await giftsApi.send(streamId, selectedGift.id, amount);
+      await giftsApi.sendToUser({
+        giftId: selectedGift.id,
+        receiverId,
+        streamId,
+        quantity: amount,
+      });
       onGiftSent?.(selectedGift, amount);
       setSelectedGift(null);
       setAmount(1);
@@ -162,8 +173,10 @@ export function GiftPanel({ streamId, isOpen, onClose, onGiftSent }: GiftPanelPr
           ) : (
             <div className="grid grid-cols-3 gap-3">
               {gifts.map((gift) => {
-                const iconType = gift.animationType || "default";
+                const tier = gift.tier || "basic";
                 const isSelected = selectedGift?.id === gift.id;
+                // Use iconUrl if it's an emoji, otherwise use default icon
+                const isEmoji = gift.iconUrl && /^\p{Emoji}/u.test(gift.iconUrl);
 
                 return (
                   <button
@@ -172,15 +185,15 @@ export function GiftPanel({ streamId, isOpen, onClose, onGiftSent }: GiftPanelPr
                     className={cn(
                       "relative flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-200",
                       isSelected
-                        ? "bg-gradient-to-br " + giftColors[iconType] + " scale-105 shadow-lg"
+                        ? "bg-gradient-to-br " + (giftColors[tier] || giftColors.default) + " scale-105 shadow-lg"
                         : "bg-gray-800 hover:bg-gray-700"
                     )}
                   >
                     <div className={cn(
-                      "mb-2",
-                      isSelected ? "text-white" : "text-" + iconType + "-400"
+                      "mb-2 text-2xl",
+                      isSelected ? "text-white" : tierColors[tier] || "text-gray-400"
                     )}>
-                      {giftIcons[iconType] || giftIcons.default}
+                      {isEmoji ? gift.iconUrl : giftIcons.default}
                     </div>
                     <span className="text-xs font-medium text-white truncate w-full text-center">
                       {gift.name}
@@ -188,7 +201,7 @@ export function GiftPanel({ streamId, isOpen, onClose, onGiftSent }: GiftPanelPr
                     <div className="flex items-center gap-1 mt-1">
                       <Sparkles className="w-3 h-3 text-yellow-400" />
                       <span className="text-xs text-yellow-400">
-                        {gift.pointsCost}
+                        {gift.pointCost}
                       </span>
                     </div>
                   </button>
@@ -225,7 +238,7 @@ export function GiftPanel({ streamId, isOpen, onClose, onGiftSent }: GiftPanelPr
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-yellow-400" />
                 <span className="font-bold text-yellow-400">
-                  {(selectedGift.pointsCost * amount).toLocaleString()}
+                  {(selectedGift.pointCost * amount).toLocaleString()}
                 </span>
               </div>
             </div>

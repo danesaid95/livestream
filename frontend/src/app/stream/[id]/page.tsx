@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
+import Link from "next/link";
 import {
   Heart,
   Share2,
@@ -13,6 +14,9 @@ import {
   ChevronLeft,
   MoreHorizontal,
   StopCircle,
+  Home,
+  Search,
+  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -307,19 +311,99 @@ export default function StreamViewerPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-950">
-      {/* Mobile Back Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-40">
-        <button
-          onClick={() => router.back()}
-          className="p-2 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-      </div>
+  // Show stream ended overlay
+  const isStreamEnded = stream.status === "ended";
 
-      <div className="flex flex-col lg:flex-row h-screen">
+  return (
+    <div className="min-h-screen bg-gray-950 flex flex-col">
+      {/* Stream Ended Overlay */}
+      {isStreamEnded && (
+        <div className="fixed inset-0 z-50 bg-gray-950/95 flex items-center justify-center">
+          <div className="text-center px-6 max-w-md">
+            <div className="w-24 h-24 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-6 ring-4 ring-gray-700">
+              <Radio className="w-12 h-12 text-gray-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">Stream Has Ended</h2>
+            <p className="text-gray-400 mb-6">
+              Thanks for watching {stream.user.displayName}&apos;s stream! Check out other live streams or follow them to get notified when they go live again.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                onClick={() => router.push("/")}
+                className="bg-violet-600 hover:bg-violet-700"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Back to Home
+              </Button>
+              <Button
+                onClick={() => router.push("/browse")}
+                variant="outline"
+              >
+                <Search className="w-4 h-4 mr-2" />
+                Browse Streams
+              </Button>
+            </div>
+            {!isFollowing && !isStreamer && isAuthenticated && (
+              <Button
+                onClick={handleFollow}
+                disabled={isFollowLoading}
+                variant="ghost"
+                className="mt-4"
+              >
+                <Heart className="w-4 h-4 mr-2" />
+                Follow {stream.user.displayName}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Header Navigation */}
+      <header className="sticky top-0 z-40 bg-gray-900/80 backdrop-blur-lg border-b border-gray-800">
+        <div className="flex items-center justify-between px-4 h-14">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <Link href="/" className="flex items-center gap-2">
+              <Radio className="w-5 h-5 text-violet-500" />
+              <span className="font-bold text-white hidden sm:inline">LiveStream</span>
+            </Link>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {stream.status === "live" && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-red-600/20 rounded-full">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-red-400 text-sm font-medium">LIVE</span>
+              </div>
+            )}
+            <span className="text-gray-400 text-sm hidden sm:inline">
+              {viewerCount.toLocaleString()} watching
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link href="/browse" className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white">
+              <Search className="w-5 h-5" />
+            </Link>
+            {isAuthenticated ? (
+              <Link href={`/profile/${user?.username}`} className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
+                <Avatar src={user?.avatarUrl} fallback={user?.displayName?.substring(0, 2) || "?"} size="sm" />
+              </Link>
+            ) : (
+              <Link href="/auth/login">
+                <Button size="sm" variant="outline">Sign In</Button>
+              </Link>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Video Player */}
@@ -468,6 +552,7 @@ export default function StreamViewerPage() {
       {/* Gift Panel */}
       <GiftPanel
         streamId={streamId}
+        receiverId={stream.user.id}
         isOpen={isGiftPanelOpen}
         onClose={() => setIsGiftPanelOpen(false)}
         onGiftSent={(gift, amount) => {

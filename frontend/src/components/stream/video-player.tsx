@@ -127,22 +127,42 @@ export function VideoPlayer({
 
       {/* No Video Fallback */}
       {!videoTrack && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-          <div className="text-center">
-            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
-              <Play className="w-10 h-10 text-gray-500" />
-            </div>
-            <p className="text-gray-400">
-              {!isLive
-                ? "Stream offline"
-                : connectionTimeout
-                ? "Host is not broadcasting"
-                : "Connecting to stream..."}
-            </p>
-            {connectionTimeout && isLive && (
-              <p className="text-gray-500 text-sm mt-2">
-                The streamer may have disconnected or is experiencing issues
-              </p>
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-900 to-violet-900/30">
+          <div className="text-center px-6">
+            {!isLive ? (
+              <>
+                <div className="w-24 h-24 rounded-full bg-gray-800/80 flex items-center justify-center mx-auto mb-6 ring-4 ring-gray-700/50">
+                  <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">Stream Has Ended</h3>
+                <p className="text-gray-400 max-w-sm mx-auto">
+                  This stream has ended. Check out other live streams or wait for the streamer to go live again.
+                </p>
+              </>
+            ) : connectionTimeout ? (
+              <>
+                <div className="w-24 h-24 rounded-full bg-gray-800/80 flex items-center justify-center mx-auto mb-6 ring-4 ring-yellow-600/30">
+                  <svg className="w-12 h-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">Host Not Broadcasting</h3>
+                <p className="text-gray-400 max-w-sm mx-auto">
+                  The streamer may have disconnected or is experiencing technical issues.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="w-24 h-24 rounded-full bg-gray-800/80 flex items-center justify-center mx-auto mb-6 ring-4 ring-violet-600/30">
+                  <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">Connecting to Stream...</h3>
+                <p className="text-gray-400 max-w-sm mx-auto">
+                  Please wait while we connect you to the live stream.
+                </p>
+              </>
             )}
           </div>
         </div>
