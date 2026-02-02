@@ -39,13 +39,25 @@ export class PointsController {
   @Post('purchase')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Create checkout session for point purchase' })
-  @ApiResponse({ status: 201, description: 'Checkout session created' })
+  @ApiOperation({ summary: 'Create payment intent for point purchase' })
+  @ApiResponse({ status: 201, description: 'Payment intent created' })
   async purchase(
     @CurrentUser() user: User,
     @Body() purchasePointsDto: PurchasePointsDto,
   ) {
-    return this.pointsService.createCheckoutSession(user.id, purchasePointsDto.packageId);
+    return this.pointsService.createPaymentIntent(user.id, purchasePointsDto.packageId);
+  }
+
+  @Post('confirm')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Confirm payment and add points' })
+  @ApiResponse({ status: 200, description: 'Payment confirmed and points added' })
+  async confirmPayment(
+    @CurrentUser() user: User,
+    @Body() body: { paymentIntentId: string },
+  ) {
+    return this.pointsService.confirmPayment(user.id, body.paymentIntentId);
   }
 
   @Post('webhook')

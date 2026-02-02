@@ -108,6 +108,15 @@ export class Stream {
   @Column({ type: 'varchar', length: 500, nullable: true })
   recordingUrl: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  recordingResourceId: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  recordingSid: string;
+
+  @Column({ type: 'int', nullable: true })
+  recordingUid: number;
+
   @Column({ type: 'uuid' })
   userId: string;
 

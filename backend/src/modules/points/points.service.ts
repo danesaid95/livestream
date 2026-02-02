@@ -42,10 +42,10 @@ export class PointsService {
     return pkg;
   }
 
-  async createCheckoutSession(
+  async createPaymentIntent(
     userId: string,
     packageId: string,
-  ): Promise<{ sessionId: string; url: string }> {
+  ): Promise<{ clientSecret: string; packageDetails: { name: string; points: number; bonusPoints: number; price: number } }> {
     if (!this.stripe) {
       throw new BadRequestException('Payment processing not configured');
     }
@@ -53,36 +53,78 @@ export class PointsService {
     const user = await this.usersService.findByIdOrFail(userId);
     const pkg = await this.getPackageById(packageId);
 
-    const session = await this.stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: this.configService.get<string>('stripe.currency', 'usd'),
-            product_data: {
-              name: pkg.name,
-              description: `${pkg.points + pkg.bonusPoints} points`,
-            },
-            unit_amount: Math.round(Number(pkg.priceUsd) * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${this.configService.get<string>('app.frontendUrl')}/points/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${this.configService.get<string>('app.frontendUrl')}/points/cancel`,
+    const paymentIntent = await this.stripe.paymentIntents.create({
+      amount: Math.round(Number(pkg.priceUsd) * 100),
+      currency: this.configService.get<string>('stripe.currency', 'usd'),
       metadata: {
         userId,
         packageId,
         points: String(pkg.points + pkg.bonusPoints),
+        packageName: pkg.name,
       },
-      customer_email: user.email,
+      automatic_payment_methods: {
+        enabled: true,
+      },
     });
 
     return {
-      sessionId: session.id,
-      url: session.url!,
+      clientSecret: paymentIntent.client_secret!,
+      packageDetails: {
+        name: pkg.name,
+        points: pkg.points,
+        bonusPoints: pkg.bonusPoints,
+        price: Number(pkg.priceUsd),
+      },
     };
+  }
+
+  async confirmPayment(
+    userId: string,
+    paymentIntentId: string,
+  ): Promise<{ success: boolean; points: number }> {
+    if (!this.stripe) {
+      throw new BadRequestException('Payment processing not configured');
+    }
+
+    const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+
+    if (paymentIntent.status !== 'succeeded') {
+      throw new BadRequestException('Payment not completed');
+    }
+
+    // Verify this payment belongs to this user
+    if (paymentIntent.metadata.userId !== userId) {
+      throw new BadRequestException('Payment does not belong to this user');
+    }
+
+    // Check if already processed
+    const existingTx = await this.transactionRepository.findOne({
+      where: { stripePaymentId: paymentIntentId },
+    });
+
+    if (existingTx) {
+      return { success: true, points: existingTx.amount };
+    }
+
+    const pointAmount = parseInt(paymentIntent.metadata.points, 10);
+    const user = await this.usersService.findByIdOrFail(userId);
+
+    const transaction = this.transactionRepository.create({
+      userId,
+      type: TransactionType.PURCHASE,
+      status: TransactionStatus.COMPLETED,
+      amount: pointAmount,
+      balanceBefore: user.pointBalance,
+      balanceAfter: user.pointBalance + pointAmount,
+      stripePaymentId: paymentIntentId,
+      usdAmount: paymentIntent.amount / 100,
+      description: `Purchased ${paymentIntent.metadata.packageName}`,
+    });
+
+    await this.transactionRepository.save(transaction);
+    await this.usersService.updatePointBalance(userId, pointAmount);
+
+    return { success: true, points: pointAmount };
   }
 
   async handleWebhook(signature: string, payload: Buffer): Promise<void> {

@@ -6,6 +6,7 @@ import { StreamsController } from './streams.controller';
 import { StreamsGateway } from './streams.gateway';
 import { Stream } from './entities/stream.entity';
 import { UsersModule } from '../users/users.module';
+import { AgoraRecordingService } from '../../common/services/agora-recording.service';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { UsersModule } from '../users/users.module';
     UsersModule,
   ],
   controllers: [StreamsController],
-  providers: [StreamsService, StreamsGateway],
+  providers: [StreamsService, StreamsGateway, AgoraRecordingService],
   exports: [StreamsService],
 })
 export class StreamsModule {}

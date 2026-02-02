@@ -104,4 +104,39 @@ export class StreamsController {
     const token = await this.streamsService.getViewerToken(id, user.id);
     return { token };
   }
+
+  @Post(':id/join')
+  @ApiOperation({ summary: 'Join a stream as a viewer' })
+  @ApiResponse({ status: 200, description: 'Joined stream successfully' })
+  @ApiResponse({ status: 404, description: 'Stream not found' })
+  @ApiResponse({ status: 403, description: 'Stream is not live' })
+  async joinStream(@Param('id', ParseUUIDPipe) id: string) {
+    const result = await this.streamsService.joinStream(id);
+    return {
+      ...result.stream,
+      agoraToken: result.agoraToken,
+      uid: result.uid,
+    };
+  }
+
+  @Post(':id/leave')
+  @ApiOperation({ summary: 'Leave a stream' })
+  @ApiResponse({ status: 200, description: 'Left stream successfully' })
+  async leaveStream(@Param('id', ParseUUIDPipe) id: string) {
+    await this.streamsService.leaveStream(id);
+    return { success: true };
+  }
+
+  @Post(':id/thumbnail')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Update stream thumbnail from video capture' })
+  @ApiResponse({ status: 200, description: 'Thumbnail updated successfully' })
+  async updateThumbnail(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { imageData: string },
+  ) {
+    return this.streamsService.updateThumbnail(id, user.id, body.imageData);
+  }
 }

@@ -35,6 +35,13 @@ export class UsersController {
     return this.usersService.searchUsers(query, page, limit);
   }
 
+  @Get('suggested')
+  @ApiOperation({ summary: 'Get suggested/popular users' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of users to return' })
+  async getSuggestedUsers(@Query('limit') limit: number = 5) {
+    return this.usersService.getSuggestedUsers(limit);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiResponse({ status: 200, description: 'User found' })
@@ -70,6 +77,19 @@ export class UsersController {
     const updatedUser = await this.usersService.update(user.id, updateUserDto);
     const { password, refreshToken, ...userWithoutSensitive } = updatedUser as any;
     return userWithoutSensitive;
+  }
+
+  @Get(':id/follow/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Check if following a user' })
+  @ApiResponse({ status: 200, description: 'Follow status' })
+  async getFollowStatus(
+    @CurrentUser() user: User,
+    @Param('id', ParseUUIDPipe) followingId: string,
+  ) {
+    const isFollowing = await this.usersService.isFollowing(user.id, followingId);
+    return { isFollowing };
   }
 
   @Post(':id/follow')

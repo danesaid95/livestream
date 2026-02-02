@@ -51,3 +51,7 @@ pgadmin_data/
 # Misc
 *.pem
 .cache/
+
+# Uploads
+uploads/
+backend/uploads/

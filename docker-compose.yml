@@ -1,6 +1,26 @@
-version: '3.8'
-
 services:
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    container_name: livestream-frontend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+      - NEXT_PUBLIC_WS_URL=http://localhost:3000
+      - NEXT_PUBLIC_AGORA_APP_ID=${AGORA_APP_ID}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - livestream-network
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -22,6 +42,8 @@ services:
       - JWT_SECRET=dev-jwt-secret-change-in-production
       - JWT_REFRESH_SECRET=dev-jwt-refresh-secret-change-in-production
       - CORS_ORIGIN=http://localhost:3001
+      - AGORA_APP_ID=${AGORA_APP_ID}
+      - AGORA_APP_CERTIFICATE=${AGORA_APP_CERTIFICATE}
     volumes:
       - ./backend:/app
       - /app/node_modules

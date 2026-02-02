@@ -146,18 +146,35 @@ export class UsersService {
   }
 
   async searchUsers(query: string, page: number = 1, limit: number = 20): Promise<{ users: User[]; total: number }> {
-    const [users, total] = await this.userRepository
+    const queryBuilder = this.userRepository
       .createQueryBuilder('user')
-      .where('user.status = :status', { status: UserStatus.ACTIVE })
-      .andWhere(
+      .where('user.status = :status', { status: UserStatus.ACTIVE });
+
+    if (query && query.trim()) {
+      queryBuilder.andWhere(
         '(user.username ILIKE :query OR user.displayName ILIKE :query)',
         { query: `%${query}%` },
-      )
+      );
+    }
+
+    const [users, total] = await queryBuilder
       .skip((page - 1) * limit)
       .take(limit)
       .orderBy('user.followerCount', 'DESC')
       .getManyAndCount();
 
     return { users, total };
+  }
+
+  async getSuggestedUsers(limit: number = 5): Promise<{ users: User[] }> {
+    const users = await this.userRepository
+      .createQueryBuilder('user')
+      .where('user.status = :status', { status: UserStatus.ACTIVE })
+      .orderBy('user.followerCount', 'DESC')
+      .addOrderBy('user.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
+
+    return { users };
   }
 }

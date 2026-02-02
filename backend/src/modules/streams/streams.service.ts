@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -7,13 +9,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { Stream, StreamStatus, StreamCategory } from './entities/stream.entity';
 import { CreateStreamDto } from './dto/create-stream.dto';
 import { UpdateStreamDto } from './dto/update-stream.dto';
+import { AgoraRecordingService } from '../../common/services/agora-recording.service';
 
 @Injectable()
 export class StreamsService {
+  private readonly logger = new Logger(StreamsService.name);
+
   constructor(
     @InjectRepository(Stream)
     private readonly streamRepository: Repository<Stream>,
     private readonly configService: ConfigService,
+    private readonly agoraRecordingService: AgoraRecordingService,
   ) {}
 
   async create(userId: string, createStreamDto: CreateStreamDto): Promise<Stream> {
@@ -83,7 +89,7 @@ export class StreamsService {
     return { streams, total };
   }
 
-  async startStream(id: string, userId: string): Promise<{ stream: Stream; token: string }> {
+  async startStream(id: string, userId: string): Promise<{ stream: Stream; token: string; uid: number }> {
     const stream = await this.findByIdOrFail(id);
 
     if (stream.userId !== userId) {
@@ -94,15 +100,43 @@ export class StreamsService {
       throw new ForbiddenException('Stream is already live');
     }
 
-    const token = this.generateAgoraToken(stream.channelName, userId, true);
+    const { token, uid } = this.generateAgoraToken(stream.channelName, userId, true);
 
     stream.status = StreamStatus.LIVE;
     stream.startedAt = new Date();
     stream.agoraToken = token;
+    stream.recordingUid = uid;
+
+    // Start cloud recording if configured
+    if (this.agoraRecordingService.isConfigured()) {
+      try {
+        const resourceId = await this.agoraRecordingService.acquireResource(stream.channelName, uid);
+        if (resourceId) {
+          const recordingResult = await this.agoraRecordingService.startRecording(
+            {
+              channelName: stream.channelName,
+              uid,
+              token,
+            },
+            resourceId,
+            stream.id,
+          );
+
+          if (recordingResult) {
+            stream.recordingResourceId = recordingResult.resourceId;
+            stream.recordingSid = recordingResult.sid;
+            this.logger.log(`Recording started for stream ${stream.id}`);
+          }
+        }
+      } catch (error) {
+        this.logger.error('Failed to start recording', error);
+        // Continue without recording - don't fail the stream start
+      }
+    }
 
     await this.streamRepository.save(stream);
 
-    return { stream, token };
+    return { stream, token, uid };
   }
 
   async endStream(id: string, userId: string): Promise<Stream> {
@@ -110,6 +144,35 @@ export class StreamsService {
 
     if (stream.userId !== userId) {
       throw new ForbiddenException('You can only end your own streams');
+    }
+
+    // Stop cloud recording if it was started
+    if (stream.recordingResourceId && stream.recordingSid && stream.recordingUid) {
+      try {
+        const stopResult = await this.agoraRecordingService.stopRecording(
+          stream.channelName,
+          stream.recordingUid,
+          stream.recordingResourceId,
+          stream.recordingSid,
+        );
+
+        if (stopResult?.serverResponse?.fileList) {
+          // Find the MP4 file from the recording
+          const mp4File = stopResult.serverResponse.fileList.find(
+            (f) => f.fileName.endsWith('.mp4'),
+          );
+          if (mp4File) {
+            stream.recordingUrl = this.agoraRecordingService.getRecordingUrl(
+              stream.id,
+              mp4File.fileName,
+            );
+            this.logger.log(`Recording saved for stream ${stream.id}: ${stream.recordingUrl}`);
+          }
+        }
+      } catch (error) {
+        this.logger.error('Failed to stop recording', error);
+        // Continue with ending the stream even if recording stop fails
+      }
     }
 
     stream.status = StreamStatus.ENDED;
@@ -124,7 +187,7 @@ export class StreamsService {
     return this.streamRepository.save(stream);
   }
 
-  async getViewerToken(id: string, viewerId: string): Promise<string> {
+  async getViewerToken(id: string, viewerId: string): Promise<{ token: string; uid: number }> {
     const stream = await this.findByIdOrFail(id);
 
     if (stream.status !== StreamStatus.LIVE) {
@@ -132,6 +195,68 @@ export class StreamsService {
     }
 
     return this.generateAgoraToken(stream.channelName, viewerId, false);
+  }
+
+  async joinStream(id: string, viewerId?: string): Promise<{ stream: Stream; agoraToken: string; uid: number }> {
+    const stream = await this.findByIdOrFail(id);
+
+    if (stream.status !== StreamStatus.LIVE) {
+      throw new ForbiddenException('Stream is not live');
+    }
+
+    // Generate a viewer ID if not authenticated
+    const finalViewerId = viewerId || uuidv4();
+    const { token, uid } = this.generateAgoraToken(stream.channelName, finalViewerId, false);
+
+    // Increment total views
+    await this.incrementTotalViews(id);
+
+    return {
+      stream,
+      agoraToken: token,
+      uid,
+    };
+  }
+
+  async leaveStream(id: string): Promise<void> {
+    // This can be used for analytics or viewer count tracking
+    // For now, just verify the stream exists
+    await this.findByIdOrFail(id);
+  }
+
+  async updateThumbnail(id: string, userId: string, imageData: string): Promise<Stream> {
+    const stream = await this.findByIdOrFail(id);
+
+    if (stream.userId !== userId) {
+      throw new ForbiddenException('You can only update your own streams');
+    }
+
+    // Validate base64 image data
+    const matches = imageData.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
+    if (!matches) {
+      throw new BadRequestException('Invalid image data format');
+    }
+
+    const extension = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const base64Data = matches[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Ensure uploads directory exists
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'thumbnails');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Save the file
+    const filename = `${stream.id}-${Date.now()}.${extension}`;
+    const filepath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filepath, buffer);
+
+    // Update the stream with the thumbnail URL
+    const baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3000');
+    stream.thumbnailUrl = `${baseUrl}/uploads/thumbnails/${filename}`;
+
+    return this.streamRepository.save(stream);
   }
 
   async updateViewerCount(id: string, count: number): Promise<void> {
@@ -164,7 +289,7 @@ export class StreamsService {
     channelName: string,
     uid: string,
     isPublisher: boolean,
-  ): string {
+  ): { token: string; uid: number } {
     const appId = this.configService.get<string>('agora.appId');
     const appCertificate = this.configService.get<string>('agora.appCertificate');
     const expirationTimeInSeconds = this.configService.get<number>('agora.tokenExpirationInSeconds', 3600);
@@ -179,7 +304,7 @@ export class StreamsService {
     const role = isPublisher ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
     const uidNumber = parseInt(uid.replace(/-/g, '').substring(0, 8), 16) % 100000000;
 
-    return RtcTokenBuilder.buildTokenWithUid(
+    const token = RtcTokenBuilder.buildTokenWithUid(
       appId,
       appCertificate,
       channelName,
@@ -187,5 +312,7 @@ export class StreamsService {
       role,
       privilegeExpiredTs,
     );
+
+    return { token, uid: uidNumber };
   }
 }
