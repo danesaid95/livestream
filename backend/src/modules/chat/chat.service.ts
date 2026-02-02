@@ -23,14 +23,28 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {}
 
+  private parseRedisUrl(url: string): { host: string; port: number; password?: string } {
+    // Handle both redis:// and rediss:// URLs
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname,
+      port: parseInt(parsed.port || '6379', 10),
+      password: parsed.password || undefined,
+    };
+  }
+
   async onModuleInit() {
     const redisUrl = this.configService.get<string>('redis.url');
     const redisHost = this.configService.get<string>('redis.host');
     const redisPort = this.configService.get<number>('redis.port');
     const redisPassword = this.configService.get<string>('redis.password');
 
+    // For Heroku Redis TLS connections, we need to accept self-signed certs
     const redisConfig = redisUrl
-      ? redisUrl
+      ? {
+          ...this.parseRedisUrl(redisUrl),
+          tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+        }
       : {
           host: redisHost,
           port: redisPort,
