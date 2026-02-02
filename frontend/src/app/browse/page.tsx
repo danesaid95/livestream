@@ -266,14 +266,7 @@ export default function BrowsePage() {
                   {sortedStreams.map((stream) => (
                     <StreamCard
                       key={stream.id}
-                      id={stream.id}
-                      title={stream.title}
-                      thumbnailUrl={stream.thumbnailUrl || undefined}
-                      category={stream.category}
-                      viewerCount={stream.viewerCount}
-                      streamerName={stream.user.displayName}
-                      streamerAvatar={stream.user.avatarUrl || undefined}
-                      isLive={true}
+                      stream={stream}
                     />
                   ))}
                 </div>
