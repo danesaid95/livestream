@@ -57,7 +57,8 @@ export default function BrowsePage() {
 
   const filteredStreams = streams.filter((stream) =>
     stream.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    stream.user.displayName.toLowerCase().includes(searchQuery.toLowerCase())
+    stream.user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (stream.user.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
   );
 
   const sortedStreams = [...filteredStreams].sort((a, b) => {
