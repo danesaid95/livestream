@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { X, Sparkles, Heart, Star, Crown, Gem, Rocket, Gift as GiftIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { giftsApi } from "@/lib/api";
@@ -234,9 +235,9 @@ export function GiftPanel({ streamId, isOpen, onClose, onGiftSent }: GiftPanelPr
         {/* Send Button */}
         <div className="p-4 border-t border-gray-800">
           {!isAuthenticated ? (
-            <Button asChild className="w-full">
-              <a href="/auth/login">Log in to Send Gifts</a>
-            </Button>
+            <Link href="/auth/login" className={cn(buttonVariants(), "w-full")}>
+              Log in to Send Gifts
+            </Link>
           ) : (
             <Button
               onClick={handleSendGift}
