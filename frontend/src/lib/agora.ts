@@ -1,4 +1,4 @@
-import AgoraRTC, {
+import type {
   IAgoraRTCClient,
   IAgoraRTCRemoteUser,
   ICameraVideoTrack,
@@ -28,6 +28,15 @@ export interface RemoteUser {
   audioTrack: IRemoteAudioTrack | null;
 }
 
+// Dynamically import AgoraRTC only on client side
+const getAgoraRTC = async () => {
+  if (typeof window === "undefined") {
+    throw new Error("AgoraRTC can only be used in browser environment");
+  }
+  const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
+  return AgoraRTC;
+};
+
 class AgoraService {
   private client: IAgoraRTCClient | null = null;
   private localTracks: LocalTracks = {
@@ -43,6 +52,8 @@ class AgoraService {
     if (this.client) {
       await this.leave();
     }
+
+    const AgoraRTC = await getAgoraRTC();
 
     this.client = AgoraRTC.createClient({
       mode: "live",
@@ -106,6 +117,8 @@ class AgoraService {
     if (!this.client) {
       throw new Error("Client not initialized");
     }
+
+    const AgoraRTC = await getAgoraRTC();
 
     const [audioTrack, videoTrack] = await Promise.all([
       AgoraRTC.createMicrophoneAudioTrack(),
