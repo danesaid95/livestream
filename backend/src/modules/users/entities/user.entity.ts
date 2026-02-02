@@ -84,7 +84,7 @@ export class User {
 
   @Exclude()
   @Column({ type: 'varchar', length: 255, nullable: true })
-  refreshToken: string;
+  refreshToken: string | null;
 
   @Column({ type: 'timestamp', nullable: true })
   lastLoginAt: Date;
