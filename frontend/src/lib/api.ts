@@ -60,6 +60,8 @@ export const authApi = {
     api.post('/auth/login', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
+  verifyEmail: (token: string) => api.get(`/auth/verify-email?token=${token}`),
+  resendVerification: () => api.post('/auth/resend-verification'),
 };
 
 export const usersApi = {

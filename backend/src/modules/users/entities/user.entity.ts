@@ -84,6 +84,13 @@ export class User {
 
   @Exclude()
   @Column({ type: 'varchar', length: 255, nullable: true })
+  emailVerificationToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  emailVerificationExpires: Date | null;
+
+  @Exclude()
+  @Column({ type: 'varchar', length: 255, nullable: true })
   refreshToken: string | null;
 
   @Column({ type: 'timestamp', nullable: true })

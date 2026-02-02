@@ -7,6 +7,7 @@ import { StreamsModule } from './modules/streams/streams.module';
 import { GiftsModule } from './modules/gifts/gifts.module';
 import { PointsModule } from './modules/points/points.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { EmailModule } from './modules/email/email.module';
 import { databaseConfig } from './config/database.config';
 import { appConfig } from './config/app.config';
 import { jwtConfig } from './config/jwt.config';
@@ -51,6 +52,7 @@ import { HealthController } from './health.controller';
       },
       inject: [ConfigService],
     }),
+    EmailModule,
     AuthModule,
     UsersModule,
     StreamsModule,

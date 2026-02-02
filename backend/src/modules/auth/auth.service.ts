@@ -7,7 +7,9 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 import { UsersService } from '../users/users.service';
+import { EmailService } from '../email/email.service';
 import { User } from '../users/entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -30,6 +32,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<{ user: User; tokens: AuthTokens }> {
@@ -51,6 +54,16 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user);
     await this.usersService.updateRefreshToken(user.id, tokens.refreshToken);
+
+    // Generate and save email verification token
+    const verificationToken = uuidv4();
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await this.usersService.setEmailVerificationToken(user.id, verificationToken, verificationExpires);
+
+    // Send verification email (async, don't wait)
+    this.emailService.sendVerificationEmail(user.email, user.username, verificationToken).catch((err) => {
+      console.error('Failed to send verification email:', err);
+    });
 
     return { user, tokens };
   }
@@ -105,6 +118,57 @@ export class AuthService {
 
   async validateJwtPayload(payload: JwtPayload): Promise<User | null> {
     return this.usersService.findById(payload.sub);
+  }
+
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const user = await this.usersService.findByVerificationToken(token);
+
+    if (!user) {
+      throw new BadRequestException('Invalid verification token');
+    }
+
+    if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
+      throw new BadRequestException('Verification token has expired');
+    }
+
+    await this.usersService.verifyEmail(user.id);
+
+    // Send welcome email
+    this.emailService.sendWelcomeEmail(user.email, user.username).catch((err) => {
+      console.error('Failed to send welcome email:', err);
+    });
+
+    return { message: 'Email verified successfully' };
+  }
+
+  async resendVerificationEmail(userId: string): Promise<{ message: string }> {
+    const user = await this.usersService.findById(userId);
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('Email is already verified');
+    }
+
+    // Generate new verification token
+    const verificationToken = uuidv4();
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await this.usersService.setEmailVerificationToken(user.id, verificationToken, verificationExpires);
+
+    // Send verification email
+    const sent = await this.emailService.sendVerificationEmail(
+      user.email,
+      user.username,
+      verificationToken,
+    );
+
+    if (!sent) {
+      throw new BadRequestException('Failed to send verification email');
+    }
+
+    return { message: 'Verification email sent' };
   }
 
   private async generateTokens(user: User): Promise<AuthTokens> {

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Check, X } from 'lucide-react';
+import { Eye, EyeOff, Check, X, Mail, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,8 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [showVerificationNotice, setShowVerificationNotice] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -44,7 +46,8 @@ export default function RegisterPage() {
       const response = await authApi.register(formData);
       const { user, tokens } = response.data.data;
       login(user, tokens.accessToken, tokens.refreshToken);
-      router.push('/');
+      setRegisteredEmail(formData.email);
+      setShowVerificationNotice(true);
     } catch (err: any) {
       const message = err.response?.data?.message;
       if (Array.isArray(message)) {
@@ -56,6 +59,76 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  if (showVerificationNotice) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-950 px-4 py-8">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <Link href="/" className="inline-flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-pink-600">
+                <span className="text-xl font-bold text-white">L</span>
+              </div>
+              <span className="text-2xl font-bold text-white">LiveStream</span>
+            </Link>
+          </div>
+
+          <Card>
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/10">
+                <Mail className="h-8 w-8 text-violet-500" />
+              </div>
+              <CardTitle>Check your email</CardTitle>
+              <CardDescription>We've sent a verification link to your email</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-gray-800/50 p-4 text-center">
+                <p className="text-sm text-gray-400">Verification email sent to:</p>
+                <p className="mt-1 font-medium text-white">{registeredEmail}</p>
+              </div>
+
+              <p className="text-center text-sm text-gray-400">
+                Click the link in the email to verify your account and unlock all features.
+                The link will expire in 24 hours.
+              </p>
+
+              <div className="space-y-2">
+                <Button
+                  onClick={() => router.push('/browse')}
+                  className="w-full"
+                >
+                  Continue to Browse
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <p className="text-center text-xs text-gray-500">
+                  You can use the platform while waiting for verification
+                </p>
+              </div>
+
+              <div className="border-t border-gray-800 pt-4">
+                <p className="text-center text-xs text-gray-500">
+                  Didn't receive the email? Check your spam folder or{' '}
+                  <button
+                    onClick={async () => {
+                      try {
+                        await authApi.resendVerification();
+                        alert('Verification email resent!');
+                      } catch (err) {
+                        alert('Failed to resend. Please try again later.');
+                      }
+                    }}
+                    className="text-violet-400 hover:underline"
+                  >
+                    resend verification email
+                  </button>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-950 px-4 py-8">

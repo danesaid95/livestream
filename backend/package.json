@@ -49,12 +49,13 @@
     "passport-local": "^1.0.0",
     "pg": "^8.11.3",
     "reflect-metadata": "^0.2.1",
+    "resend": "^6.9.1",
     "rxjs": "^7.8.1",
     "stripe": "^14.14.0",
-    "typeorm": "^0.3.19",
-    "uuid": "^9.0.1",
     "ts-node": "^10.9.2",
-    "tsconfig-paths": "^4.2.0"
+    "tsconfig-paths": "^4.2.0",
+    "typeorm": "^0.3.19",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.0",

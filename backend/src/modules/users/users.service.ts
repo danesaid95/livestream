@@ -66,6 +66,27 @@ export class UsersService {
     await this.userRepository.update(id, { lastLoginAt: new Date() });
   }
 
+  async setEmailVerificationToken(id: string, token: string, expires: Date): Promise<void> {
+    await this.userRepository.update(id, {
+      emailVerificationToken: token,
+      emailVerificationExpires: expires,
+    });
+  }
+
+  async findByVerificationToken(token: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { emailVerificationToken: token },
+    });
+  }
+
+  async verifyEmail(id: string): Promise<void> {
+    await this.userRepository.update(id, {
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpires: null,
+    });
+  }
+
   async updatePointBalance(id: string, amount: number): Promise<User> {
     const user = await this.findByIdOrFail(id);
     user.pointBalance += amount;
