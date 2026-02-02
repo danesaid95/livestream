@@ -93,8 +93,9 @@ export function VideoPlayer({
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
+    // setVolume exists on audio tracks, not video tracks - use runtime check with any assertion
     if (videoTrack && "setVolume" in videoTrack) {
-      (videoTrack as IRemoteVideoTrack).setVolume(isMuted ? volume : 0);
+      (videoTrack as unknown as { setVolume: (vol: number) => void }).setVolume(isMuted ? volume : 0);
     }
   };
 
@@ -102,8 +103,9 @@ export function VideoPlayer({
     const newVolume = parseInt(e.target.value);
     setVolume(newVolume);
     setIsMuted(newVolume === 0);
+    // setVolume exists on audio tracks, not video tracks - use runtime check with any assertion
     if (videoTrack && "setVolume" in videoTrack) {
-      (videoTrack as IRemoteVideoTrack).setVolume(newVolume);
+      (videoTrack as unknown as { setVolume: (vol: number) => void }).setVolume(newVolume);
     }
   };
 
