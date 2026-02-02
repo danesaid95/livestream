@@ -9,19 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { StreamCard } from "@/components/stream/stream-card";
 import { streamsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-interface Stream {
-  id: string;
-  title: string;
-  thumbnailUrl: string | null;
-  category: string;
-  viewerCount: number;
-  user: {
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-  };
-}
+import { Stream } from "@/types";
 
 const CATEGORIES = [
   { id: "all", name: "All", icon: Grid },
